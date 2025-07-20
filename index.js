@@ -47,7 +47,7 @@ app.post('/generate-text', async (req, res) => {
   
 });
 
-app.post('/describe-image', upload.single('image'), async (req, res) => {
+app.post('/generate-from-image', upload.single('image'), async (req, res) => {
   const prompt = req.body.prompt;
   const image = imageToGenerativePart(req.file.path);
   if(!prompt) {
@@ -69,9 +69,27 @@ app.post('/describe-image', upload.single('image'), async (req, res) => {
   }
 });
 
-
-app.listen(port, () => {
-  console.log(`Gemini API Server is running on http://localhost:${port}`)
+app.post('/generate-from-document', upload.single('document'), async (req, res) => {
+  const filePath = req.file.path;
+  const buffer = fs.readFileSync(filePath);
+  const base64 = buffer.toString('base64');
+  const mimeType = req.file.mimetype;
+  try {
+    const documentPart = {
+        inlineData: {
+        data: base64,
+        mimeType: mimeType,
+      }
+    };
+    const result = await model.generateContent([documentPart]);
+    const response = result.response;
+    const text = response.text();
+    res.json({ ouput: text });
+  } catch (error) {
+    res.status(500).json( { error: error.message });
+  } finally {
+    fs.unlinkSync(filePath);
+  }
 });
 
 // image To Generative Part ---
@@ -103,3 +121,7 @@ function imageToGenerativePart(imagePath) {
     },
   };
 }
+
+app.listen(port, () => {
+  console.log(`Gemini API Server is running on http://localhost:${port}`)
+});
